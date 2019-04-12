@@ -64,7 +64,10 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "lib/ert_lib.h"
+#include "led.h"
 #include "Sensors/GPS/minmea.h"
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -86,8 +89,8 @@
 
 /* USER CODE BEGIN PV */
 uint8_t rx;
-uint8_t tx[300];
-uint8_t line[MINMEA_MAX_LENGTH];
+char tx[300];
+char line[MINMEA_MAX_LENGTH];
 struct minmea_sentence_gga gga;
 /* USER CODE END PV */
 
@@ -149,12 +152,18 @@ int main(void)
   MX_USART6_UART_Init();
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
-
+  led_init();
+  INFO("GPS PARSER\n");
+  led_set_rgb(150, 150, 150);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   uint8_t idx = 0;
+  uint32_t cntr = 0;
+  float latitude = 0.0f;
+  float longitude = 0.0f;
+  float altitude = 0.0f;
   while (1)
   {
 	  while(1)
@@ -170,7 +179,7 @@ int main(void)
 	  while(1)
 	  {
 		  HAL_UART_Receive(&huart6, &rx, 1, 100);
-		  if(rx == '\n' || rx == '\r')
+		  if(rx == '\n' || rx == '\r' || rx == '$')
 		  {
 			  line[++idx] = '\0';
 			  break;
@@ -182,17 +191,26 @@ int main(void)
 		  minmea_parse_gga(&gga, line);
 		  if(gga.fix_quality)
 		  {
-			  sprintf(tx, "Time: %dH%dM%dS\nPosition: %f lat %f long\n", gga.time.hours,
-					  gga.time.minutes, gga.time.seconds, minmea_tofloat(&gga.latitude),
-					  minmea_tofloat(&gga.longitude));
+			  latitude = minmea_tocoord(&(gga.latitude));
+			  longitude = minmea_tocoord(&(gga.longitude));
+			  altitude = minmea_tofloat(&(gga.altitude));
+			  sprintf(tx, "Time: %dH%dM%dS\nPosition: %f, %f, %f\n", gga.time.hours,
+					  gga.time.minutes, gga.time.seconds, latitude, longitude, altitude);
+			  led_set_rgb(0, 150, 0);
+			  cntr = 0;
 		  }
 		  else
-			  sprintf(tx, "Waiting for a fix...\n");
-		  HAL_UART_Transmit(&huart3, tx, strlen(tx), 100);
+		  {
+			  sprintf(tx, "Waiting for a fix... (%d)\n", cntr++);
+			  led_set_rgb(150, 0, 0);
+		  }
+		  INFO(tx);
 	  }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+//	  HAL_UART_Receive(&huart6, &rx, 1, 100);
+//	  INFO(&rx);
   }
   /* USER CODE END 3 */
 }
